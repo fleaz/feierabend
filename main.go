@@ -3,36 +3,70 @@ package main
 import (
 	"flag"
 	"fmt"
-	"github.com/fatih/color"
-	"gopkg.in/src-d/go-git.v4"
 	"os"
 	"path/filepath"
+
+	"github.com/kirsle/configdir"
+
+	"github.com/fleaz/feierabend/cache"
+	"github.com/fleaz/feierabend/gittools"
 )
 
-func handler(path string, f os.FileInfo, err error) error {
-	if f.IsDir() {
-		r, err := git.PlainOpen(path)
-		if err == nil && r != nil {
-			// We found valid git repo
-			wt, _ := r.Worktree()
-			s, _ := wt.Status()
-			if s.IsClean() == false {
-				color.Red("%q is in a dirty state", path)
-			}
+func getTraversalHandler(repoCache cache.Cache) func(path string, f os.FileInfo, err error) error {
+
+	return func(path string, f os.FileInfo, err error) error {
+
+		if !f.IsDir() {
 			return filepath.SkipDir
 		}
+
+		fmt.Printf("Checking %v", path)
+
+		gittools.CheckRepo(path)
+
+		if repoCache != nil {
+			repoCache.Write(path)
+		}
+
+		return nil
+	}
+}
+
+func ensureConfigurationDirectory() string {
+	configPath := configdir.LocalConfig("feierabend")
+	err := configdir.MakePath(configPath)
+
+	if err != nil {
+		panic(err)
 	}
 
-	return nil
+	return configPath
 }
 
 func main() {
 	var workspace = flag.String("workspace", ".", "Path to your GIT repositories")
+	var useCache = flag.Bool("use-cache", false, "Uses path cache")
+
 	flag.Parse()
 
-	err := filepath.Walk(*workspace, handler)
-	if err != nil {
-		fmt.Println(err)
+	// Creating configuration directory
+	configPath := ensureConfigurationDirectory()
+	gitRepoFileCache := cache.NewGitRepoFileCache(configPath, false)
+
+	traversalHandler := getTraversalHandler(gitRepoFileCache)
+
+	if *useCache {
+		gitRepos := gitRepoFileCache.ReadAll()
+
+		for _, gitRepo := range gitRepos {
+			fmt.Printf("Checking %v\n", gitRepo)
+			gittools.CheckRepo(gitRepo)
+		}
+	} else {
+		err := filepath.Walk(*workspace, traversalHandler)
+		if err != nil {
+			fmt.Println(err)
+		}
 	}
 
 }
