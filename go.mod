@@ -4,6 +4,7 @@ go 1.13
 
 require (
 	github.com/fatih/color v1.7.0
+	github.com/kirsle/configdir v0.0.0-20170128060238-e45d2f54772f
 	github.com/mattn/go-colorable v0.1.4 // indirect
 	github.com/mattn/go-isatty v0.0.10 // indirect
 	github.com/src-d/go-git v4.7.0+incompatible
